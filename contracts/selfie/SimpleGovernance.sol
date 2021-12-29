@@ -90,3 +90,5 @@ contract SimpleGovernance {
         return balance > halfTotalSupply;
     }
 }
+
+
